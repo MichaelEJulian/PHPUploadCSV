@@ -58,24 +58,94 @@ function recreateTable($user, $password, $host, $dbname){
 
 function dryRun($csvfile)
 {
-/*
-$row = 1;
-if (($handle = fopen("users.csv", "r")) !== FALSE) {
-    while (($data = fgetcsv($handle, 0, ",")) !== FALSE) {
-        $num = count($data);
-        echo "<p> $num fields in line $row: <br /></p>\n";
-        $row++;
-        for ($c=0; $c < $num; $c++) {
-            echo $data[$c] . "<br />\n";
+    try 
+    {
+        $row = 1; //Start 1 Ignoring CSV Heading
+        $added = 0;
+        $failed = 0;
+        $failedlines = '';
+        if (($handle = fopen($csvfile, "r")) !== FALSE) {
+            fgets($handle);
+            while (($data = fgetcsv($handle, 0, ",")) !== FALSE) {
+                $row++;
+                $num = count($data); //Column count
+               
+                if ($num == 3){ // get 3 columns on this row
+                    $name = ucfirst(strtolower(trim($data[0])));
+                    $surname = ucfirst(strtolower(trim($data[1])));
+                    $email = strtolower(trim($data[2]));
+                    $lineerror = false;
+                    $lineerrormsg = '';
+
+                    if (strlen(trim($name)) == 0 || strlen($name) > 100){
+                        $lineerror = true;
+                        $lineerrormsg .= " -- Name - Invalid Length\n";
+                    }
+
+                    if (strlen(trim($surname)) == 0 || strlen($surname) > 100){
+                        $lineerror = true;
+                        $lineerrormsg .= " -- Surname - Invalid Length\n";
+                    }
+
+                    if (strlen(trim($email)) == 0 || strlen($email) > 200){
+                        $lineerror = true;
+                        $lineerrormsg .= " -- Email - Invalid Length\n";
+                    }
+
+                    if (!filter_var($email, FILTER_VALIDATE_EMAIL)){
+                        $lineerror = true;
+                        $lineerrormsg .= " -- Email - Invalid Format\n";
+                    } 
+
+                    if ($lineerror){
+                        $failed++;
+                        $failedlines .= "Row $row - Invalid Row Data => $name, $surname, $email\n" . $lineerrormsg;
+                    }
+                    else{
+                        $added++;
+                    }
+                }
+                else{
+                    $failed++;
+                    $failedlines .= "Row $row - Invalid Row Data\n" . " -- Incorrect number of columns\n";
+                }
+               
+                
+
+            } // End While
+
+            echo "Total Processed = " . ($row - 1) . "\n";
+            echo "Total Added = $added\n";
+            echo "Total Failed = $failed\n";
+
+            if ($failed > 0){
+                echo $failedlines;
+            }
+
+            fclose($handle);
         }
+        
+        if ($failed == 0){
+            return true;
+        }
+        else{
+            return false;
+        }
+    } 
+    catch (Exception $e) 
+    {
+        echo $e->errorMessage();
+        return false;
     }
-    fclose($handle);
-}
-*/
 }
 
 function processCSV($csvfile, $user, $password, $host, $database){
+    if (dryRun($csvfile)){ // CSV format is ok proceed
+        echo "Process CSV => Truncate table and add CSV records";
+    }
+    else{ // Do nothing process is all CSV should be valid or no records added
 
+    }
 }
 
 function showHelp(){
@@ -145,9 +215,8 @@ if (count($options))
         }
         else{
             if(array_key_exists('dry_run', $options)){
-                //Process the CSV
-                print "Do a dry run of the CSV";
-
+                //Do a dry run of the CSV no DB processing at this stage
+                dryRun($csvfile);
             }
             else{
                 //We process the CSV but first check that we passed the DB parameters and can connect to DB
@@ -169,9 +238,6 @@ if (count($options))
                 else{
                     $errors .= "-u -p -h -d DB parameters are required\n";
                 }
-
-               
-
             }
         }
     }
