@@ -1,0 +1,12 @@
+Total Record = 12
+
+Total Valid = 9
+
+Total Invalid = 3
+Row 8 - Invalid Row Data => 'Hamish, Jones, ham@seek.com'
+ -- Email - Duplicate record
+Row 9 - Invalid Row Data => ', Walters, sam!_)@walters.org'
+ -- Name - Invalid Length
+ -- Email - Invalid Format
+Row 12 - Invalid Row Data => 'Edward, Jikes, edward@jikes@com.au'
+ -- Email - Invalid Format

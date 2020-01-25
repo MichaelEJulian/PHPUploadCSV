@@ -1,38 +1,19 @@
 <?php
 
-function checkDBConnection($user, $password, $host, $dbname){
-    try {
-        $conn = @mysqli_connect($host, $user, $password, $dbname);
-    } catch (Exception $e) {
-        echo $e->errorMessage();
-        return false;
+error_reporting(E_ALL ^ E_WARNING);
+
+function getDBConnection($user, $password, $host, $dbname){
+    $conn = new mysqli($host, $user, $password, $dbname);
+
+    if (mysqli_connect_error()) {
+        echo mysqli_connect_errno() . ":" . mysqli_connect_error();
+        return null;
     }
 
-    // Close connection
-    if ($conn){
-        $conn->close();
-    }
-    
-    return true;
+    return $conn;
 }
 
-function recreateTable($user, $password, $host, $dbname){
-    $conn = mysqli_connect($host, $user, $password,$dbname);  
-         
-    try {
-        $conn = @mysqli_connect($host, $user, $password, $dbname);
-    } catch (Exception $e) {
-        echo $e->errorMessage();
-        return false;
-    }
-
-    $sql = "DROP TABLE users";
-    if(mysqli_query($conn, $sql)) {  
-        echo "Table 'users' deleted successfully\n";  
-    }else {  
-        echo "Failed to delete 'users' table\n";
-    }  
-
+function createTable($conn){
     $sql = <<<EOT
     CREATE TABLE `users` (
         `name` varchar(100) NOT NULL,
@@ -47,35 +28,41 @@ function recreateTable($user, $password, $host, $dbname){
     }
     else{
         echo "Failed to create 'users' table\n";
+        echo "Error description: " . mysqli_error($conn);
     }
-    
-    // Close connection
-    if ($conn){
-        $conn->close();
-    }
-
 }
 
-function dryRun($csvfile)
+function processCSV($csvfile, $conn, $isdryrun)
 {
     try 
     {
-        $row = 1; //Start 1 Ignoring CSV Heading
-        $added = 0;
-        $failed = 0;
-        $failedlines = '';
+        $row = 1; //start row 1
+        $uploadcnt=0; //count of uploaded records
+        $failedcnt=0; //count of failed upload
+        $validcnt = 0; //count of valid csv row
+        $invalidcnt = 0; //count of invalid csv row -> invalid length, invalid email
+        $invalidlines = '';//Use to display invalid form in CSV
+        $failedlines = ''; //Use to display error when upload to DB failed
+        $records = array(); //Array to save to check for duplicate for unique email in CSV
         if (($handle = fopen($csvfile, "r")) !== FALSE) {
-            fgets($handle);
+            fgets($handle); //read a line ignore heading
             while (($data = fgetcsv($handle, 0, ",")) !== FALSE) {
                 $row++;
-                $num = count($data); //Column count
+                $num = count($data); //column count
                
-                if ($num == 3){ // get 3 columns on this row
+                if ($num == 3){ // get 3 columns
                     $name = ucfirst(strtolower(trim($data[0])));
                     $surname = ucfirst(strtolower(trim($data[1])));
                     $email = strtolower(trim($data[2]));
+
                     $lineerror = false;
                     $lineerrormsg = '';
+
+                    //Validate CSV Row
+                    if (isset($records[$email])){ //We already have this email make this invalid
+                        $lineerror = true;
+                        $lineerrormsg .= " -- Email - Duplicate record\n";
+                    }
 
                     if (strlen(trim($name)) == 0 || strlen($name) > 100){
                         $lineerror = true;
@@ -96,40 +83,64 @@ function dryRun($csvfile)
                         $lineerror = true;
                         $lineerrormsg .= " -- Email - Invalid Format\n";
                     } 
+                    //End Validate
 
                     if ($lineerror){
-                        $failed++;
-                        $failedlines .= "Row $row - Invalid Row Data => $name, $surname, $email\n" . $lineerrormsg;
+                        $invalidcnt++;
+                        $invalidlines .= "Row $row - Invalid Row Data => '$name, $surname, $email'\n" . $lineerrormsg;
                     }
                     else{
-                        $added++;
+
+                        if (!$isdryrun){
+                            //Add to DB if not a dry run
+                            $name = $conn->real_escape_string($name);
+                            $surname = $conn->real_escape_string($surname);
+                            $email = $conn->real_escape_string($email);
+
+                            $sql = "REPLACE into users (name, surname, email) VALUES ('$name','$surname','$email')";    
+                            
+                            if ($conn->query($sql)) {
+                                $uploadcnt++;
+                            }
+                            else{
+                                $failedlines.="Row $row failed - : " . $conn->error . "\n";
+                                $failedcnt++;
+                            }
+                        }
+                        $validcnt++;
+                    }
+
+                    //Save this record to check duplicate using email as key
+                    if (!isset($records[$email])){
+                        $records += [$email => 1];
                     }
                 }
                 else{
-                    $failed++;
-                    $failedlines .= "Row $row - Invalid Row Data\n" . " -- Incorrect number of columns\n";
+                    $invalidcnt++;
+                    $invalidlines .= "Row $row - Invalid Row Data\n" . " -- Incorrect number of columns\n";
                 }
-               
-                
-
             } // End While
 
-            echo "Total Processed = " . ($row - 1) . "\n";
-            echo "Total Added = $added\n";
-            echo "Total Failed = $failed\n";
+            //Close file
+            fclose($handle);
 
-            if ($failed > 0){
-                echo $failedlines;
+            echo "Total Record = " . ($row - 1) . "\n";
+            echo "\nTotal Valid = $validcnt\n";
+            echo "\nTotal Invalid = $invalidcnt\n";
+
+            if ($validcnt > 0){
+                echo $invalidlines;
             }
 
-            fclose($handle);
-        }
-        
-        if ($failed == 0){
-            return true;
-        }
-        else{
-            return false;
+            if (!$isdryrun){
+                echo "\nTotal Uploaded = $uploadcnt\n";
+                echo "\nTotal Failed = $failedcnt\n";
+
+                if ($failedcnt > 0){
+                    echo $failedlines;
+                }
+            }
+            
         }
     } 
     catch (Exception $e) 
@@ -139,20 +150,10 @@ function dryRun($csvfile)
     }
 }
 
-function processCSV($csvfile, $user, $password, $host, $database){
-    if (dryRun($csvfile)){ // CSV format is ok proceed
-        echo "Process CSV => Truncate table and add CSV records";
-    }
-    else{ // Do nothing process is all CSV should be valid or no records added
-
-    }
-}
-
 function showHelp(){
-
     $bar = <<<EOT
         --file [csv file name] – this is the name of the CSV to be parsed 
-        --create_table – this will cause the MySQL users table to be built (and no further • action will be taken) 
+        --create_table – this will cause the MySQL users table to be built (and no further action will be taken) 
         --dry_run – this will be used with the 
         --file directive in case we want to run the script but not insert into the DB. 
           All other functions will be executed, but the database won't be altered 
@@ -160,23 +161,24 @@ function showHelp(){
         -u – MySQL username 
         -p – MySQL password 
         -h – MySQL host 
-        -d - MySQL database
+        -d - MySQL database (optional leave empty on dedicated mySQL server)
         --help - show Help guide. 
 
     EOT;
-
     echo $bar;
     exit;
-
 }
 
-// Script example.php
+$conn = null; //DB Connection 
+
+// Short parameter option prefix with '-'
 $shortopts  = "";
 $shortopts .= "u:";  // Required value MySQL User
 $shortopts .= "p:";  // Required value mySQL Password
 $shortopts .= "h:";  // Required value mySQL Host
-$shortopts .= "d:";  // Optional value mySQL Host
+$shortopts .= "d:"; // Optional value mySQL Database Name
 
+// Short parameter option prefix with '--'
 $longopts  = array(
     "file:",         // Required value Passed the CSV to process
     "create_table",  // No Value - Create the table only no other processing
@@ -192,19 +194,29 @@ if (count($options))
 {
     // Recreate the table if this parameter exist also check that DB parameter is valid
     if (array_key_exists('create_table', $options)){
-        if (array_key_exists('u', $options) && array_key_exists('p', $options) && array_key_exists('h', $options) && array_key_exists('d', $options)){
+        if (array_key_exists('u', $options) 
+        && array_key_exists('p', $options) 
+        && array_key_exists('h', $options)){
             $dbusername = $options['u'];
             $dbpassword = $options['p'];
             $dbhost = $options['h'];
-            $dbname = $options['d'];
+            
+            $dbname = "";
+            if (array_key_exists('d', $options)){
+                $dbname = $options['d'];
+            }
 
-            if (!checkDBConnection($dbusername, $dbpassword, $dbhost, $dbname)){
+            $conn = getDBConnection($dbusername, $dbpassword, $dbhost, $dbname);
+            if (!$conn){
                 $errors .= "DB connection is not valid\n";
             }
             else{
-                //Drop and Create the users table
-                recreateTable($dbusername, $dbpassword, $dbhost, $dbname);
+                //Create the users table
+                createTable($conn);
             }
+        }
+        else{
+            $errors .= "-u -p -h DB parameters are required\n";
         }
     }
     //Dry Run or Process the CSV need --file parameter
@@ -216,40 +228,58 @@ if (count($options))
         else{
             if(array_key_exists('dry_run', $options)){
                 //Do a dry run of the CSV no DB processing at this stage
-                dryRun($csvfile);
+                processCSV($csvfile, null, true);
             }
             else{
                 //We process the CSV but first check that we passed the DB parameters and can connect to DB
-                if (array_key_exists('u', $options) && array_key_exists('p', $options) && array_key_exists('h', $options) && array_key_exists('d', $options)){
+                if (array_key_exists('u', $options) 
+                && array_key_exists('p', $options) 
+                && array_key_exists('h', $options)){
                     $dbusername = $options['u'];
                     $dbpassword = $options['p'];
                     $dbhost = $options['h'];
-                    $dbname = $options['d'];
+                   
+                    $dbname = "";
+                    if (array_key_exists('d', $options)){
+                        $dbname = $options['d'];
+                    }
 
-                    if (!checkDBConnection($dbusername, $dbpassword, $dbhost, $dbname)){
+                    $conn = getDBConnection($dbusername, $dbpassword, $dbhost, $dbname);
+                    if (!$conn){
                         $errors .= "DB connection is not valid\n";
                     }
                     else{
                         //Process the CSV
-                        print "Process the CSV";
+                        processCSV($csvfile, $conn, false);
                     }
-
                 }
                 else{
-                    $errors .= "-u -p -h -d DB parameters are required\n";
+                    $errors .= "-u -p -h DB parameters are required\n";
                 }
             }
         }
     }
+    //Help Option
+    elseif (array_key_exists('help', $options)){ 
+        showHelp();
+    }
     else{
         $errors .= "Invalid option parameter\n";
+        
     }
 }
 else{
+    echo "Invalid option parameter\n";
     showHelp();
 }
 
+if ($errors){
+    echo "Error encountered: $errors";
+}
 
-echo $errors;
+// Close connection if it exists
+if ($conn){
+    $conn->close();
+}
 
 ?>

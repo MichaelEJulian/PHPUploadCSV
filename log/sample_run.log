@@ -1,0 +1,68 @@
+C:\xampp\htdocs\catalyst>php foobar.php
+1, 2, foo, 4, bar, foo, 7, 8, foo, bar, 11, foo, 13, 14, foobar, 16, 17, foo, 19, bar, foo, 22, 23, foo, bar, 26, foo, 28, 29, foobar, 31, 32, foo, 34, bar, foo, 37, 38, foo, bar, 41, foo, 43, 44, foobar, 46, 47, foo, 49, bar, foo, 52, 53, foo, bar, 56, foo, 58, 59, foobar, 61, 62, foo, 64, bar, foo, 67, 68, foo, bar, 71, foo, 73, 74, foobar, 76, 77, foo, 79, bar, foo, 82, 83, foo, bar, 86, foo, 88, 89, foobar, 91, 92, foo, 94, bar, foo, 97, 98, foo, bar
+C:\xampp\htdocs\catalyst>php user_upload.php --create_table -u myuser -p mypassword -h localhost -d catalyst
+Table 'users' created successfully
+
+C:\xampp\htdocs\catalyst>php user_upload.php --create_table -u myuser -p mypassword -h localhost -d catalyst
+Failed to create 'users' table
+Error description: Table 'users' already exists
+C:\xampp\htdocs\catalyst>
+C:\xampp\htdocs\catalyst>
+C:\xampp\htdocs\catalyst>php user_upload.php --file users1.csv --dry_run
+Error encountered: --file value users1.csv is not found or valid
+
+C:\xampp\htdocs\catalyst>php user_upload.php --file users.csv --dry_run
+Total Record = 12
+
+Total Valid = 9
+
+Total Invalid = 3
+Row 8 - Invalid Row Data => 'Hamish, Jones, ham@seek.com'
+ -- Email - Duplicate record
+Row 9 - Invalid Row Data => ', Walters, sam!_)@walters.org'
+ -- Name - Invalid Length
+ -- Email - Invalid Format
+Row 12 - Invalid Row Data => 'Edward, Jikes, edward@jikes@com.au'
+ -- Email - Invalid Format
+
+C:\xampp\htdocs\catalyst>php user_upload.php --file users.csv -u myuser -p mypassword -h localhost -d catalyst
+Total Record = 12
+
+Total Valid = 9
+
+Total Invalid = 3
+Row 8 - Invalid Row Data => 'Hamish, Jones, ham@seek.com'
+ -- Email - Duplicate record
+Row 9 - Invalid Row Data => ', Walters, sam!_)@walters.org'
+ -- Name - Invalid Length
+ -- Email - Invalid Format
+Row 12 - Invalid Row Data => 'Edward, Jikes, edward@jikes@com.au'
+ -- Email - Invalid Format
+
+Total Uploaded = 9
+
+Total Failed = 0
+
+C:\xampp\htdocs\catalyst>
+C:\xampp\htdocs\catalyst>php user_upload.php --file users.csv -u myuser -p mypassword -h localhost -d catalyst1
+1044:Access denied for user 'myuser'@'localhost' to database 'catalyst1'Error encountered: DB connection is not valid
+
+C:\xampp\htdocs\catalyst>php user_upload.php --file users.csv -u myuser -p mypassword -h localhost -d catalyst
+Total Record = 12
+
+Total Valid = 9
+
+Total Invalid = 3
+Row 8 - Invalid Row Data => 'Hamish, Jones, ham@seek.com'
+ -- Email - Duplicate record
+Row 9 - Invalid Row Data => ', Walters, sam!_)@walters.org'
+ -- Name - Invalid Length
+ -- Email - Invalid Format
+Row 12 - Invalid Row Data => 'Edward, Jikes, edward@jikes@com.au'
+ -- Email - Invalid Format
+
+Total Uploaded = 9
+
+Total Failed = 0
+
+C:\xampp\htdocs\catalyst>

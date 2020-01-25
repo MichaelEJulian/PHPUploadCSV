@@ -1,25 +1,38 @@
 <?php
 
-$output = "";
+class FooBar{
 
-for ($x=1; $x <= 100; $x++){
+    static public function show($num){
+        if (is_int($num)){
+            $output = "";
 
-    if ($output != ""){$output .= ", ";}
+            for ($x=1; $x <= $num; $x++){
 
-    if (($x % 3 === 0) && ($x % 5 === 0)){
-        $output .= "foobar";
-    }
-    elseif ($x % 3 === 0){
-        $output .= "foo";
-    }
-    elseif ($x % 5 === 0){
-        $output .= "bar";
-    }
-    else{
-        $output .= $x;
-    }
+                if ($output != ""){$output .= ", ";}
+
+                if (($x % 3 === 0) && ($x % 5 === 0)){
+                    $output .= "foobar";
+                }
+                elseif ($x % 3 === 0){
+                    $output .= "foo";
+                }
+                elseif ($x % 5 === 0){
+                    $output .= "bar";
+                }
+                else{
+                    $output .= $x;
+                }
+            }
+
+            echo $output;
+
+        }
+        else{
+            echo "Number is not an integer";
+        }
+    }    
 }
 
-echo $output;
+FooBar::show(100);
 
 ?>
